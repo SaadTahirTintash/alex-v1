@@ -303,6 +303,28 @@ const {
     }
   };  
 
+  const ytpGetPositionGivenMint = async (yieldToken, shares) => {
+    console.log('--------------------------------------------------------------------------');
+    console.log('[YTP] get-position-given-mint...', yieldToken, shares);
+  
+    const options = {
+      contractAddress: process.env.DEPLOYER_ACCOUNT_ADDRESS,
+      contractName: 'yield-token-pool',
+      functionName: 'get-position-given-mint',
+      functionArgs: [
+        contractPrincipalCV(process.env.DEPLOYER_ACCOUNT_ADDRESS, yieldToken),
+        uintCV(shares)
+      ],
+      network: network,
+      senderAddress: process.env.USER_ACCOUNT_ADDRESS,
+    };
+    try {
+      return callReadOnlyFunction(options);
+    } catch (error) {
+      console.log(error);
+    }
+  };  
+
   const ytpGetPositionGivenBurn = async (yieldToken, shares) => {
     console.log('--------------------------------------------------------------------------');
     console.log('[YTP] get-position-given-burn...', yieldToken, shares);
@@ -372,3 +394,4 @@ const {
   exports.ytpGetXgivenYield = ytpGetXgivenYield;
   exports.ytpGetYgivenYield = ytpGetYgivenYield;
   exports.ytpGetPositionGivenBurn = ytpGetPositionGivenBurn;
+  exports.ytpGetPositionGivenMint = ytpGetPositionGivenMint;

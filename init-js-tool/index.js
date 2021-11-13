@@ -56,7 +56,8 @@ const {
     ytpReducePosition,
     ytpGetXgivenYield,
     ytpGetYgivenYield,
-    ytpGetPositionGivenBurn
+    ytpGetPositionGivenBurn,
+    ytpGetPositionGivenMint
 } = require('./pools-ytp')
 
 const _deploy = {
@@ -291,6 +292,16 @@ async function create_ytp(add_only, _subset=_deploy) {
     for (const key in _subset) {
         if (_subset[key]['pool_token'] != '') {
             if (add_only) {
+                let dy = await ytpGetPositionGivenMint(_subset[key]['yield_token'], _subset[key]['liquidity_ytp']);
+                let spot = Number((await crpGetSpot(_subset[key]['token'], _subset[key]['collateral'], _subset[key]['expiry'])).value.value) / ONE_8;
+                let lev = Number((await crpGetLtv(_subset[key]['token'], _subset[key]['collateral'], _subset[key]['expiry'])).value.value) / ONE_8;
+                lev /= Number((await ytpGetPrice(_subset[key]['yield_token'])).value.value) / ONE_8;
+                dx = Number(dy.value.data['dy-act'].value) * spot;
+                dx /= lev;
+
+                let multiplier = 1.1;
+            
+                await crpAddToPostion(_subset[key]['token'], _subset[key]['collateral'], _subset[key]['yield_token'], _subset[key]['key_token'], Math.round(dx * multiplier));
                 await ytpAddToPosition(_subset[key]['yield_token'], _subset[key]['token'], _subset[key]['pool_token'], _subset[key]['liquidity_ytp']);
             } else {
                 await ytpCreate(_subset[key]['yield_token'], _subset[key]['token'], _subset[key]['pool_token'], _subset[key]['multisig_ytp'], _subset[key]['liquidity_ytp'], _subset[key]['liquidity_ytp']);
@@ -625,7 +636,7 @@ async function test_margin_trading() {
     let margin = Math.round(amount * (1 - ltv)); // in BTC
     let leverage = 1 / (1 - ltv);
 
-    console.log("ltv: ", format_number(ltv, 2), "; amount (BTC): ", format_number(amount, 8), "; margin (BTC): ", format_number(margin, 8));
+    console.log("ltv: ", format_number(ltv, 2), "; amount (BTC): ", format_number(amount / ONE_8, 8), "; margin (BTC): ", format_number(margin / ONE_8, 8));
     console.log("leverage: ", format_number(leverage, 2), "; trade_price (USD): ", format_number(trade_price, 2));
 
     await flashloan('flash-loan-user-margin-wbtc-usda-11520', 'token-wbtc', (amount - margin));
@@ -641,7 +652,7 @@ async function test_margin_trading() {
     margin = Math.round(amount * (1 - ltv) * Number(wbtcPrice) / ONE_8); // in USD
     leverage = 1 / (1 - ltv);
 
-    console.log("ltv: ", format_number(ltv, 2), "; amount (BTC): ", format_number(amount, 8), "; margin (USD): ", format_number(margin, 2));
+    console.log("ltv: ", format_number(ltv, 2), "; amount (BTC): ", format_number(amount / ONE_8, 8), "; margin (USD): ", format_number(margin / ONE_8, 2));
     console.log("leverage: ", format_number(leverage, 2), "; trade_price (USD): ", format_number(trade_price, 2))
 
     await flashloan('flash-loan-user-margin-usda-wbtc-11520', 'token-usda', (trade_price - margin));
@@ -687,12 +698,12 @@ async function get_pool_details_ytp(_subset=_deploy) {
 
         console.log('yield: ', format_number(Number(yied.value.value) / ONE_8, 8), 'price: ', format_number(Number(price.value.value) / ONE_8, 8));
         console.log('balance (yield-token / virtual / token): ',
-            format_number(Number(balance_aytoken.value) / ONE_8),
+            format_number(Number(balance_aytoken.value) / ONE_8, 8),
             ' / ',
-            format_number(Number(balance_virtual.value) / ONE_8),
+            format_number(Number(balance_virtual.value) / ONE_8, 8),
             ' / ',
-            format_number(Number(balance_token.value) / ONE_8));
-        console.log('total-supply: ', format_number(Number(total_supply.value) / ONE_8));
+            format_number(Number(balance_token.value) / ONE_8, 8));
+        console.log('total-supply: ', format_number(Number(total_supply.value) / ONE_8, 8));
     }
 }
 
@@ -822,11 +833,6 @@ async function run() {
     // await get_pool_details_ytp(_pools);   
 
     // await reduce_position_fwp(0.9 * ONE_8);
-
-    // const _reduce = { 0: _deploy[14] , 1: _deploy[15] };
-    // await reduce_position_ytp(_reduce, 0.9*ONE_8, deployer=true);
-    // await get_pool_details_ytp(_subset=_reduce);   
-
     // await reduce_position_ytp(_pools, 0.1*ONE_8, deployer=true);
     // await reduce_position_crp(_pools, ONE_8, 'yield');
     // await reduce_position_crp(_pools, ONE_8, 'key');    
