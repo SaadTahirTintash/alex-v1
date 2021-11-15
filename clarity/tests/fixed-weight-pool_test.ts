@@ -2,15 +2,8 @@
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.14.0/index.ts';
 import { assertEquals } from 'https://deno.land/std@0.90.0/testing/asserts.ts';
 
-import { 
-    FWPTestAgent1,
-  } from './models/alex-tests-fixed-weight-pool.ts';
-
-import { 
-    MS_FWP_WBTC_USDA_5050,
-} from './models/alex-tests-multisigs.ts';
-import { OracleManager } from './models/alex-tests-oracle-mock.ts';
-
+import { FWPTestAgent1 } from './models/alex-tests-fixed-weight-pool.ts';
+import { MS_FWP_WBTC_USDA_5050 } from './models/alex-tests-multisigs.ts';
 import { 
     USDAToken,
     WBTCToken,
@@ -38,7 +31,7 @@ const wbtcQ = 100*ONE_8
 
 
 Clarinet.test({
-    name: "FWP : Pool creation, adding values and reducing values",
+    name: "FWP : pool creation, adding values and reducing values",
 
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get("deployer")!;
@@ -114,7 +107,7 @@ Clarinet.test({
 });
 
 Clarinet.test({
-    name: "FWP : Trait check",
+    name: "FWP : trait check",
 
     async fn(chain: Chain, accounts: Map<string, Account>){
         let deployer = accounts.get("deployer")!;
@@ -162,7 +155,7 @@ Clarinet.test({
 
 
 Clarinet.test({
-    name: "FWP : Fee Setting using Multisig ",
+    name: "FWP : fee Setting using multisig ",
 
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get("deployer")!;
@@ -273,7 +266,7 @@ Clarinet.test({
 
 
 Clarinet.test({
-    name: "FWP : Error Testing",
+    name: "FWP : error testing",
 
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get("deployer")!;
@@ -378,9 +371,7 @@ Clarinet.test({
     async fn(chain: Chain, accounts: Map<string, Account>) {
         let deployer = accounts.get("deployer")!;
         let wallet_1 = accounts.get("wallet_1")!;
-        let FWPTest = new FWPTestAgent1(chain, deployer);
-        let Oracle = new OracleManager(chain, deployer);
-        
+        let FWPTest = new FWPTestAgent1(chain, deployer);                 
         let usdaToken = new USDAToken(chain, deployer);
         let wbtcToken = new WBTCToken(chain, deployer);
         let mint = usdaToken.mint(deployer.address, 10*ONE_8);
@@ -388,12 +379,6 @@ Clarinet.test({
         mint = usdaToken.mint(wallet_1.address, 200000);
         mint = wbtcToken.mint(deployer.address, 20000*ONE_8);
         mint = wbtcToken.mint(wallet_1.address, 20000*ONE_8);
-
-        // initialise prices
-        let oracleresult = Oracle.updatePrice(deployer,"WBTC", "coingecko" ,wbtcPrice * ONE_8);
-        oracleresult.expectOk()            
-        oracleresult = Oracle.updatePrice(deployer,"USDA", "coingecko" ,usdaPrice * ONE_8);
-        oracleresult.expectOk()                    
 
         // Deployer creating a pool, initial tokens injected to the pool
         let result = FWPTest.createPool(deployer, wbtcAddress, usdaAddress, weightX, weightY, fwpwbtcusdaAddress, multisigAddress, wbtcQ, wbtcQ*wbtcPrice);
@@ -405,10 +390,6 @@ Clarinet.test({
         position['total-supply'].expectUint(2236067605752);
         position['balance-x'].expectUint(wbtcQ);
         position['balance-y'].expectUint(wbtcQ*wbtcPrice);
-
-        // wbtc (token) rises by 10% vs usda (collateral)
-        oracleresult = Oracle.updatePrice(deployer,"WBTC", "coingecko" ,wbtcPrice * ONE_8 * 1.1);
-        oracleresult.expectOk()
 
         // now pool price still implies wbtcPrice
         call = await FWPTest.getPoolDetails(wbtcAddress, usdaAddress, weightX, weightY);
@@ -429,11 +410,7 @@ Clarinet.test({
         call = await FWPTest.getPoolDetails(wbtcAddress, usdaAddress, weightX, weightY);
         position = call.result.expectOk().expectTuple();
         position['balance-x'].expectUint(10000000000 - 488087600);
-        position['balance-y'].expectUint(500000000000000 + 23268715000000);     
-
-        // wbtc (token) then falls by 30% vs usda (collateral)
-        oracleresult = Oracle.updatePrice(deployer,"WBTC", "coingecko" ,wbtcPrice * ONE_8 * 1.1 * 0.95);
-        oracleresult.expectOk()        
+        position['balance-y'].expectUint(500000000000000 + 23268715000000);       
         
         // let's do some arb
         // but calling get-y-given-price throws an error

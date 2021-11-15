@@ -19,7 +19,7 @@
 (define-constant ERR-MATH-CALL (err u2010))
 (define-constant ERR-INTERNAL-FUNCTION-CALL (err u1001))
 
-(define-data-var contract-owner principal tx-sender)
+(define-data-var CONTRACT-OWNER principal tx-sender)
 
 (define-map approved-contracts principal bool)
 
@@ -27,13 +27,13 @@
 (define-data-var flash-loan-fee-rate uint u0)
 
 (define-read-only (get-owner)
-  (ok (var-get contract-owner))
+  (ok (var-get CONTRACT-OWNER))
 )
 
 (define-public (set-owner (owner principal))
   (begin
-    (asserts! (is-eq contract-caller (var-get contract-owner)) ERR-NOT-AUTHORIZED)
-    (ok (var-set contract-owner owner))
+    (asserts! (is-eq contract-caller (var-get CONTRACT-OWNER)) ERR-NOT-AUTHORIZED)
+    (ok (var-set CONTRACT-OWNER owner))
   )
 )
 
@@ -47,7 +47,7 @@
 
 (define-public (set-flash-loan-fee-rate (fee uint))
   (begin
-    (asserts! (is-eq contract-caller (var-get contract-owner)) ERR-NOT-AUTHORIZED)
+    (asserts! (is-eq contract-caller (var-get CONTRACT-OWNER)) ERR-NOT-AUTHORIZED)
     (ok (var-set flash-loan-fee-rate fee))
   )
 )
@@ -58,25 +58,25 @@
 )
 
 ;; if sender is an approved contract, then transfer requested amount :qfrom vault to recipient
-(define-public (transfer-ft (token <ft-trait>) (amount uint) (sender principal) (recipient principal))
+(define-public (transfer-ft (token <ft-trait>) (amount uint) (recipient principal))
   (begin     
-    (try! (check-is-approved sender))
+    (try! (check-is-approved contract-caller))
     (as-contract (unwrap! (contract-call? token transfer amount tx-sender recipient none) ERR-TRANSFER-FAILED))
     (ok true)
   )
 )
 
-(define-public (transfer-yield (token <yield-token-trait>) (amount uint) (sender principal) (recipient principal))
+(define-public (transfer-yield (token <yield-token-trait>) (amount uint) (recipient principal))
   (begin     
-    (try! (check-is-approved sender))
+    (try! (check-is-approved contract-caller))
     (as-contract (unwrap! (contract-call? token transfer amount tx-sender recipient none) ERR-TRANSFER-FAILED))
     (ok true)
   )
 )
 
-(define-public (transfer-pool (token <pool-token-trait>) (amount uint) (sender principal) (recipient principal))
+(define-public (transfer-pool (token <pool-token-trait>) (amount uint) (recipient principal))
   (begin     
-    (try! (check-is-approved sender))
+    (try! (check-is-approved contract-caller))
     (as-contract (unwrap! (contract-call? token transfer amount tx-sender recipient none) ERR-TRANSFER-FAILED))
     (ok true)
   )
@@ -104,6 +104,14 @@
     ;; return the loan + fee
     (unwrap! (contract-call? token transfer amount-with-fee tx-sender (as-contract tx-sender) none) ERR-POST-LOAN-TRANSFER-FAILED)
     (ok amount-with-fee)
+  )
+)
+
+(define-public (ft-transfer-multi (token-x <ft-trait>) (amount-x uint) (token-y <ft-trait>) (amount-y uint) (recipient principal))
+  (begin 
+    (try! (transfer-ft token-x amount-x recipient)) 
+    (try! (transfer-ft token-y amount-y recipient))
+    (ok true)
   )
 )
 
