@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { ClarityType, getNonce } = require('@stacks/transactions');
-const { initCoinPrice, setOpenOracle, getOpenOracle } = require('./oracles').default
+const { initCoinPrice, setOpenOracle, getOpenOracle, fetch_price, fetch_btc, fetch_usdc, fetch_in_usd } = require('./oracles').default
 const { flashloan, getBalance, mint, burn, balance, transfer } = require('./vault')
 const { setUsdaAmount, setWbtcAmount, setStxAmount, getSomeTokens, setAlexAmount } = require('./faucet')
 const {
@@ -33,7 +33,8 @@ const {
     crpGetPoolValueInToken,
     crpGetWeightY,
     crpSwapXforY,
-    crpSwapYforX
+    crpSwapYforX,
+    crpGetPositionGivenBurnKey
 } = require('./pools-crp')
 const {
     ytpCreate,
@@ -54,8 +55,9 @@ const {
 const {
     reserveAddToken,
     reserveSetActivationDelay,
-    reserveSetActicationThreshold,
-    reserveRegisterUser
+    reserveSetActivationThreshold,
+    reserveRegisterUser,
+    reserveSetCoinbaseAmount
 } = require('./reserve')
 const {
     multisigPropose,
@@ -177,9 +179,9 @@ async function see_balance(owner) {
     console.log('wbtc balance: ', format_number(Number(wbtc_balance.value.value) / ONE_8));
 }
 
-async function create_fwp(add_only) {
+async function create_fwp(add_only, deployer=false) {
     console.log("------ FWP Creation / Add Liquidity ------");
-    let wbtcPrice = (await getOpenOracle('coingecko', 'WBTC')).value.value;
+    let wbtcPrice = await fetch_btc('usd');
 
     _pools = {
         1: {
@@ -196,7 +198,7 @@ async function create_fwp(add_only) {
 
     for (const key in _pools) {
         if (add_only) {
-            await fwpAddToPosition(_pools[key]['token_x'], _pools[key]['token_y'], _pools[key]['weight_x'], _pools[key]['weight_y'], _pools[key]['pool_token'], _pools[key]['left_side'], _pools[key]['right_side']);
+            await fwpAddToPosition(_pools[key]['token_x'], _pools[key]['token_y'], _pools[key]['weight_x'], _pools[key]['weight_y'], _pools[key]['pool_token'], _pools[key]['left_side'], _pools[key]['right_side'], deployer);
         } else {
             await fwpCreate(_pools[key]['token_x'], _pools[key]['token_y'], _pools[key]['weight_x'], _pools[key]['weight_y'], _pools[key]['pool_token'], _pools[key]['multisig'], _pools[key]['left_side'], _pools[key]['right_side']);
             await fwpSetOracleEnbled(_pools[key]['token_x'], _pools[key]['token_y'], _pools[key]['weight_x'], _pools[key]['weight_y']);
@@ -265,8 +267,8 @@ async function arbitrage_fwp(dry_run = true) {
 
     const threshold = 0.002;
 
-    let wbtcPrice = (await getOpenOracle('coingecko', 'WBTC')).value.value;
-    let usdaPrice = (await getOpenOracle('coingecko', 'USDA')).value.value;
+    let wbtcPrice = await fetch_btc('usd');
+    let usdaPrice = await fetch_usdc('usd');
 
     let printed = parseFloat(wbtcPrice / usdaPrice);
 
@@ -335,8 +337,8 @@ async function arbitrage_crp(dry_run = true, _subset=_deploy) {
     console.log(timestamp());
 
     const threshold = 0.002;
-    let wbtcPrice = (await getOpenOracle('coingecko', 'WBTC')).value.value;
-    let usdaPrice = (await getOpenOracle('coingecko', 'USDA')).value.value;
+    let wbtcPrice = await fetch_btc('usd');
+    let usdaPrice = await fetch_usdc('usd');
 
     for (const key in _subset) {
         // console.log(_subset[key]);
@@ -522,8 +524,8 @@ async function arbitrage_ytp(dry_run = true, _subset=_deploy) {
 async function test_spot_trading() {
     console.log("------ Testing Spot Trading ------");
     console.log(timestamp());
-    let wbtcPrice = (await getOpenOracle('coingecko', 'WBTC')).value.value;
-    let usdaPrice = (await getOpenOracle('coingecko', 'USDA')).value.value;
+    let wbtcPrice = await fetch_btc('usd');
+    let usdaPrice = await fetch_usdc('usd');
 
     let from_amount = ONE_8;
     let to_amount = parseInt((await fwpGetYgivenX('token-wbtc', 'token-usda', 0.5e+8, 0.5e+8, from_amount)).value.value);
@@ -543,8 +545,8 @@ async function test_spot_trading() {
 async function test_margin_trading() {
     console.log("------ Testing Margin Trading (Long BTC vs USD) ------");
     console.log(timestamp());
-    let wbtcPrice = (await getOpenOracle('coingecko', 'WBTC')).value.value;
-    let usdaPrice = (await getOpenOracle('coingecko', 'USDA')).value.value;
+    let wbtcPrice = await fetch_btc('usd');
+    let usdaPrice = await fetch_usdc('usd');
 
     let expiry_0 = 34560e+8
     let amount = 1 * ONE_8; //gross exposure of 1 BTC
@@ -724,9 +726,9 @@ async function run() {
     //                     8:_deploy[10],
     //                     9:_deploy[11]
     //                 };
-    // const _pools = { 0:_deploy[2], 1:_deploy[3] };
+    const _pools = { 0:_deploy[0], 1:_deploy[1] };
     // const _pools = { 0:_deploy[0], 1:_deploy[1], 2:_deploy[2], 3:_deploy[3]};
-    const _pools = _deploy;
+    // const _pools = _deploy;
 
     // await create_fwp(add_only=false);
     // await create_ytp(add_only=false, _pools);
@@ -740,7 +742,7 @@ async function run() {
     // await test_spot_trading();
     // await test_margin_trading();
 
-    // await create_fwp(add_only=true);
+    // await create_fwp(add_only=true, deployer=true);
     // await create_crp(add_only=true, _pools);     
     // await create_ytp(add_only=true, _pools);
 
@@ -774,8 +776,8 @@ async function run() {
     // await arbitrage_fwp(dry_run = false);
     // await mint_some_wbtc('ST32AK70FP7VNAD68KVDQF3K8XSFG99WKVEHVAPFA');    
     // await see_balance(process.env.USER_ACCOUNT_ADDRESS);   
-    // result = await ytpGetPositionGivenBurn('yield-wbtc-200335', 625000000000, deployer=true);      
-    // console.log(result);
+    // result = await crpGetPositionGivenBurnKey('token-wbtc', 'token-usda', 34560e8, 0.873e8);      
+    // console.log(printResult(result));
 
     // result = await balance('key-usda-34560-wbtc', process.env.USER_ACCOUNT_ADDRESS);
     // console.log(result);
@@ -789,9 +791,10 @@ async function run() {
     // }
 
     // result = await reserveAddToken('token-t-alex');
-    // console.log(result);
+    // result = await reserveSetActivationThreshold(1);
+    // result = await reserveSetActivationDelay(1);
     // result = await reserveRegisterUser('token-t-alex');
-    // console.log(result);
+    // result = await reserveSetCoinbaseAmount('token-t-alex', 50000e8, 25000e8, 12500e8, 6250e8, 3750e8);
 
     // await multisigPropose('multisig-fwp-wbtc-usda-50-50', 22330, 'update fee', '', 0.003 * ONE_8, 0.003 * ONE_8);
     // result = await balance('fwp-wbtc-usda-50-50', process.env.DEPLOYER_ACCOUNT_ADDRESS);
