@@ -726,9 +726,9 @@ async function run() {
     //                     8:_deploy[10],
     //                     9:_deploy[11]
     //                 };
-    const _pools = { 0:_deploy[0], 1:_deploy[1] };
+    // const _pools = { 0:_deploy[0], 1:_deploy[1] };
     // const _pools = { 0:_deploy[0], 1:_deploy[1], 2:_deploy[2], 3:_deploy[3]};
-    // const _pools = _deploy;
+    const _pools = _deploy;
 
     // await create_fwp(add_only=false);
     // await create_ytp(add_only=false, _pools);
