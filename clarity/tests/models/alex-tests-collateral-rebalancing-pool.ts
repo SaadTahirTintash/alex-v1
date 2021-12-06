@@ -48,7 +48,7 @@ import {
         types.uint(expiry),
         types.uint(strike),
         types.uint(bs_vol),
-        types.unit(spot)
+        types.uint(spot)
       ], this.deployer.address);
     }
 
@@ -151,14 +151,14 @@ import {
         return block.receipts[0].result;
       }
   
-    swapXForY(user: Account, token: string, collateral: string, expiry: number, dX: number, dy_min: number) {
+    swapXForY(user: Account, token: string, collateral: string, expiry: number, dX: number, min_dy: number) {
       let block = this.chain.mineBlock([
         Tx.contractCall("collateral-rebalancing-pool", "swap-x-for-y", [
           types.principal(token),
           types.principal(collateral),
           types.uint(expiry),
           types.uint(dX),
-          types.some(types.uint(dy_min))
+          types.some(types.uint(min_dy))
         ], user.address),
       ]);
       return block.receipts[0].result;
