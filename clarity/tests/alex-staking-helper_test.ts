@@ -2,9 +2,10 @@
 
 import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.14.0/index.ts';
 
-const tokenContract = "token-alex";
+const tokenContract = "token-t-alex";
 const reserveContract = "alex-reserve-pool";
 const helperContract = "alex-staking-helper";
+const laplaceContract = "alex-staking-helper-laplace";
 const reward_cycle_length = 525;
 
 const ONE_8 = 100000000;
@@ -27,12 +28,6 @@ class AlexStakingHelper {
         ]);
         return block.receipts[0].result;
     }
-    
-    // getStaked(sender: Account, reward_cycle: number) {
-    //     return this.chain.callReadOnlyFn(helperContract, "get-staker-at-cycle-or-default-by-tx-sender", [
-    //       types.uint(reward_cycle)
-    //     ], sender.address);
-    // }
 
     getStaked(sender: Account, reward_cycles: Array<number>) {
         return this.chain.callReadOnlyFn(helperContract, "get-staked", [
@@ -129,7 +124,14 @@ class AlexStakingHelper {
         ], sender.address),
       ]);
       return block.receipts[0].result;        
-    }       
+    }    
+    
+    getStakingStatsCoinbaseAsList(token: string, reward_cycles: Array<number>) {
+      return this.chain.callReadOnlyFn(laplaceContract, "get-staking-stats-coinbase-as-list", [
+        types.principal(token),
+        types.list(reward_cycles.map(e=>{return types.uint(e)}))
+      ], this.deployer.address);
+    }
 }
 
 /**
@@ -181,7 +183,13 @@ Clarinet.test({
 
         result0 = result[2].expectTuple();
         result0['amount-staked'].expectUint(100e8);
-        result0['to-return'].expectUint(100e8);        
+        result0['to-return'].expectUint(100e8);          
+
+        call = await StakingTest.getStakingStatsCoinbaseAsList(alexAddress, [0,1,3]);
+        result = call.result.expectList();
+        result0 = result[0].expectTuple();
+        result0['staking-stats'].expectUint(0);
+        result0['coinbase-amount'].expectUint(ONE_8);      
 
         call = await StakingTest.getFirstStacksBlocksInRewardCycle(alexAddress, 1);
         result = call.result.expectUint(8 + reward_cycle_length);
